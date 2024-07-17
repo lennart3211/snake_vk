@@ -14,7 +14,6 @@
 #include "textures/TextureHandler.h"
 #include "textures/Texture.h"
 
-#include <entt/entt.hpp>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FROCE_DEPTH_ZERO_TO_ONE
@@ -34,8 +33,8 @@ namespace engine {
 
     class Application {
     private:
-        static constexpr uint16_t WIDTH = 1920;
-        static constexpr uint16_t HEIGHT = 1920;
+        static constexpr uint16_t WIDTH = 1080;
+        static constexpr uint16_t HEIGHT = 1080;
         Window mWindow{WIDTH, HEIGHT, "App"};
         Device mDevice{mWindow};
         Renderer mRenderer{mWindow, mDevice};

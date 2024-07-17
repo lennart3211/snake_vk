@@ -34,25 +34,43 @@ else()
 endif()
 
 
-# 2. Set GLFW_PATH in .env.cmake to target specific glfw
-if (DEFINED GLFW_PATH)
-    message(STATUS "Using GLFW path specified in .env")
-    set(GLFW_INCLUDE_DIRS "${GLFW_PATH}/include")
-    if (MSVC)
-        set(GLFW_LIB "${GLFW_PATH}/lib-vc2019") # 2.1 Update lib-vc2019 to use same version as your visual studio
-    elseif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
-        message(STATUS "USING MINGW")
-        set(GLFW_LIB "${GLFW_PATH}/lib-mingw-w64") # 2.1 make sure matches glfw mingw subdirectory
+# GLFW handling
+find_package(glfw3 3.3 QUIET)
+
+if (NOT glfw3_FOUND)
+    message(STATUS "GLFW not found. Attempting to download and build GLFW.")
+    include(FetchContent)
+    FetchContent_Declare(
+            glfw
+            GIT_REPOSITORY https://github.com/glfw/glfw.git
+            GIT_TAG 3.3.8
+    )
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+    # Add verbose output for FetchContent
+    set(FETCHCONTENT_QUIET OFF)
+
+    FetchContent_MakeAvailable(glfw)
+
+    if (NOT glfw_POPULATED)
+        message(FATAL_ERROR "Failed to download or extract GLFW.")
+    endif()
+
+    if (TARGET glfw)
+        message(STATUS "GLFW built successfully.")
+        set(GLFW_FOUND TRUE)
+    else()
+        message(FATAL_ERROR "GLFW target not created. Build may have failed.")
     endif()
 else()
-    find_package(glfw3 3.4 REQUIRED)
-    set(GLFW_LIB glfw)
-    message(STATUS "Found GLFW")
+    message(STATUS "Found GLFW: ${glfw3_VERSION}")
+    set(GLFW_FOUND TRUE)
 endif()
-if (NOT GLFW_LIB)
-    message(FATAL_ERROR "Could not find glfw library!")
-else()
-    message(STATUS "Using glfw lib at: ${GLFW_LIB}")
+
+if (NOT GLFW_FOUND)
+    message(FATAL_ERROR "Could not find or build GLFW library!")
 endif()
 
 include_directories(external)
@@ -98,7 +116,7 @@ if (WIN32)
             ${GLFW_LIB}
     )
 
-    target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 imm32)
+    target_link_libraries(${PROJECT_NAME} glfw ${Vulkan_LIBRARIES} imm32)
 elseif (UNIX)
     message(STATUS "CREATING BUILD FOR UNIX")
     target_include_directories(${PROJECT_NAME} PUBLIC
