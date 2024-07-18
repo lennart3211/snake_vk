@@ -59,7 +59,8 @@ namespace engine {
 
         uint8_t numStages = configInfo.geomPath.empty() ? 2 : 3;
 
-        VkPipelineShaderStageCreateInfo shaderStages[numStages];
+        // VkPipelineShaderStageCreateInfo shaderStages[numStages];
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages{ numStages };
         shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
         shaderStages[0].module = m_VertShaderModule;
@@ -101,7 +102,7 @@ namespace engine {
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = numStages;
-        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pStages = shaderStages.data();
         pipelineInfo.pVertexInputState = &vertexInputInfo;
         pipelineInfo.pInputAssemblyState = &configInfo.inputAssemblyInfo;
         pipelineInfo.pViewportState = &configInfo.viewportInfo;
