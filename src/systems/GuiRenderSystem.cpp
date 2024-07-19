@@ -5,7 +5,7 @@
 
 namespace engine {
 
-    struct PushConstantData_2D {
+    struct ParticlePushConstantsData {
         glm::mat3 modelMatrix{1.0f};
     };
 
@@ -32,15 +32,15 @@ namespace engine {
                 nullptr
         );
 
-        frameInfo.particleSystem.Bind (frameInfo.commandBuffer);
-        frameInfo.particleSystem.Render(frameInfo.commandBuffer);
+//        frameInfo.particleSystem.Bind (frameInfo.commandBuffer);
+//        frameInfo.particleSystem.Render(frameInfo.commandBuffer);
     }
 
     void GuiRenderSystem::CreatePipelineLayout(VkDescriptorSetLayout globalSetLayout) {
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstantRange.offset = 0;
-        pushConstantRange.size = sizeof(PushConstantData_2D);
+        pushConstantRange.size = sizeof(ParticlePushConstantsData);
 
         std::vector<VkDescriptorSetLayout> descriptorSetLayouts{globalSetLayout};
 

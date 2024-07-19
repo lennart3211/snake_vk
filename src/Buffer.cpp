@@ -48,6 +48,7 @@ namespace engine {
 
     Buffer::~Buffer() {
         unmap();
+        vkDeviceWaitIdle(m_Device.device());
         vkDestroyBuffer(m_Device.device(), buffer, nullptr);
         vkFreeMemory(m_Device.device(), memory, nullptr);
     }

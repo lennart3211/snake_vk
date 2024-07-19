@@ -33,8 +33,8 @@ namespace engine {
 
     class Application {
     private:
-        static constexpr uint16_t WIDTH = 1080;
-        static constexpr uint16_t HEIGHT = 1080;
+        static constexpr uint16_t WIDTH = 1920;
+        static constexpr uint16_t HEIGHT = 1920;
         Window mWindow{WIDTH, HEIGHT, "App"};
         Device mDevice{mWindow};
         Renderer mRenderer{mWindow, mDevice};
@@ -57,5 +57,7 @@ namespace engine {
     private:
         void Update();
         void Render();
+
+        float frand(float min, float max);
     };
 } // namespace engine

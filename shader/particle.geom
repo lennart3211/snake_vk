@@ -4,10 +4,8 @@ layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
 layout(location = 0) in vec2 inPosition[];
-layout(location = 1) in vec2 inVelocity[];
-layout(location = 2) in vec4 inColor[];
-layout(location = 3) in float inSize[];
-layout(location = 4) in float inLife[];
+layout(location = 1) in vec4 inColor[];
+layout(location = 2) in float inSize[];
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec2 outTexCoord;

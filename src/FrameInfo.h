@@ -28,7 +28,6 @@ namespace engine {
         float frameTime;
         VkCommandBuffer commandBuffer;
         std::vector<VkDescriptorSet> descriptorSets;
-        SnakeGame &particleSystem;
     };
 }
 

@@ -11,6 +11,7 @@
 
 #include <chrono>
 #include <memory>
+#include <random>
 
 namespace engine {
 
@@ -25,6 +26,9 @@ namespace engine {
 
     void Application::run() {
         Imgui imgui{mWindow, mDevice, mRenderer.GetSwapChainRenderPass(), mRenderer.GetImageCount()};
+
+        ImGuiIO& io = ImGui::GetIO();
+        io.Fonts->AddFontFromFileTTF("../font/MontserratAlternates-Bold.otf", 32.0f);
 
         std::vector<std::unique_ptr<Buffer>> uboBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < uboBuffers.size(); i++) {
@@ -47,24 +51,26 @@ namespace engine {
                     .build(globalDescriptorSets[i]);
         }
 
-        const uint32_t MAX_PARTICLES = 20;
-        SnakeGame particleSystem{mDevice, MAX_PARTICLES};
-        ParticleRenderSystem renderSystem2D{mDevice, mRenderer.GetSwapChainRenderPass(), globalSetLayout->getDescriptorSetLayout()};
+//        const uint32_t MAX_PARTICLES = 23;
+//        ParticleRenderSystem particleRenderSystem{mDevice, mRenderer.GetSwapChainRenderPass(),
+//                                            globalSetLayout->getDescriptorSetLayout(), MAX_PARTICLES};
+        std::unique_ptr<ParticleRenderSystem> particleRenderSystem;
+        uint32_t maxScore;
 
-        std::shared_ptr<PointForce> pointForce = std::make_shared<PointForce>(glm::vec2(0), -0.01f);
-        particleSystem.SetPointForce(pointForce);
+        Particle *apple;
 
+        bool isRunning = false;
+        bool showMenu = true;
+        bool startNewGame = false;
+        bool quitGame = false;
+
+        std::vector<LinkedParticle> snake;
 
 
         mBackgroundColor = glm::vec3(0.3f, 0.5f, 1.0f);
         mRenderer.SetClearColor(mBackgroundColor);
 
         auto currentTime = std::chrono::high_resolution_clock::now();
-
-        Particle newParticle{glm::vec2(0), glm::vec2(0), glm::vec4(1), 0.01, 1};
-        float velo = 0.2;
-
-        float offset = 0.0f;
 
         while (!mWindow.shouldClose()) {
             glfwPollEvents();
@@ -82,68 +88,166 @@ namespace engine {
                         frameIndex,
                         frameTime,
                         commandBuffer,
-                        {globalDescriptorSets[frameIndex]},
-                        particleSystem};
+                        {globalDescriptorSets[frameIndex]}
+                      };
 
                 mRenderer.SetClearColor(mBackgroundColor);
 
                 GlobalUbo ubo{};
                 ubo.ambientLightColor = glm::vec4(mRenderer.GetClearColor(), 0.3f);
 
-                particleSystem.Update(frameTime, mWindow.getCursorPosition());
-
                 uboBuffers[frameIndex]->writeToBuffer(&ubo);
                 uboBuffers[frameIndex]->flush();
 
-                pointForce->location = mWindow.getCursorPosition();
+                if (startNewGame) {
+                    particleRenderSystem = std::make_unique<ParticleRenderSystem>(mDevice,
+                                                                                  mRenderer.GetSwapChainRenderPass(),
+                                                                                  globalSetLayout->getDescriptorSetLayout(),
+                                                                                  maxScore + 2);
+
+                    apple = particleRenderSystem->AddParticle(glm::vec2(frand(-1, 1), frand(-0.8, 0.8)),
+                                                              glm::vec4(0.7, 0.1, 0.1, 1),
+                                                              0.02);
+
+                    snake.clear();
+                    Particle *temp = particleRenderSystem->AddParticle(glm::vec2(0, 0.02), glm::vec4(1), 0.01);
+                    snake.emplace_back(particleRenderSystem->AddParticle(glm::vec2(0, 0), glm::vec4(1), 0.01), temp);
+                    snake.emplace_back(temp, nullptr);
+
+                    startNewGame = false;
+                    isRunning = true;
+                }
+
+                if (quitGame) {
+                    break;
+                }
+
+                if (isRunning) {
+                    snake[0].particle->position = mWindow.getCursorPosition();
+
+                    glm::vec2 distanceVector = snake[0].particle->position - apple->position;
+                    float distanceSquared = glm::dot(distanceVector, distanceVector);
+                    float collisionDistanceSquared = (snake[0].particle->size + apple->size) * (snake[0].particle->size + apple->size);
+
+                    if (distanceSquared <= collisionDistanceSquared) {
+                        apple->position = glm::vec2(frand(-0.8, 0.8), frand(-0.8, 0.8));
+                        snake.emplace_back(particleRenderSystem->AddParticle(snake.back().particle->position, glm::vec4(1), 0.01),nullptr);
+                        snake[snake.size() - 2].child = snake.back().particle;
+
+                        if (!snake.back().particle) {
+                            isRunning = false;
+                            snake.pop_back();
+                        }
+                    }
+
+                    for (auto &linkedParticle : snake) {
+                        if (!linkedParticle.child) continue;
+                        glm::vec2 dist = linkedParticle.distToChild();
+                        float maxDist = linkedParticle.particle->size + linkedParticle.child->size;
+                        if (glm::length(dist) > maxDist) {
+                            linkedParticle.child->position = linkedParticle.particle->position - glm::normalize(dist) * maxDist;
+                        }
+                    }
+
+                    for (uint32_t i{0}; i + 1 < snake.size(); ++i) {
+                        for (uint32_t j{i + 1}; j < snake.size(); ++j) {
+                            if (snake[i].child != snake[j].particle &&
+                                snake[j].child != snake[i].particle &&
+                                glm::length(snake[i].particle->position - snake[j].particle->position) < snake[i].particle->size + snake[j].particle->size) {
+                                isRunning = false;
+                            }
+                        }
+                    }
+                }
+
 
 
                 // render
                 mRenderer.BeginSwapChainRenderPass(commandBuffer);
 
-                renderSystem2D.RenderGameObjects(frameInfo);
+                if (isRunning) particleRenderSystem->Render(frameInfo);
 
                 ImGui::Begin("Settings");
                 {
-                    std::string message = "Time since last frame: " + std::to_string(frameTime) + "ms";
-                    ImGui::Text(message.c_str());
+                    ImGui::Text("Time since last frame: %f", frameTime);
 
                     ImGui::ColorPicker3("Background Color", &mBackgroundColor.x);
 
                 }
                 ImGui::End();
 
-                ImGui::Begin("Particles");
+                ImGui::SetNextWindowPos(ImVec2(0, 0));
+                ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, 0));
+                ImGui::Begin("Snake", nullptr, ImGuiWindowFlags_NoMove |
+                                               ImGuiWindowFlags_NoResize |
+                                               ImGuiWindowFlags_NoTitleBar |
+                                               ImGuiWindowFlags_NoScrollbar |
+                                               ImGuiWindowFlags_NoSavedSettings);
                 {
-                    uint32_t numParticles = particleSystem.NumParticles();
-                    ImGui::Text("Number of Particles: %d", numParticles);
-                    ImGui::SliderInt("", (int *)&numParticles, 0, MAX_PARTICLES);
-                    if (numParticles != particleSystem.NumParticles()) {
-                        particleSystem.MakeLinked();
-                        particleSystem.SetNumParticles(numParticles);
-                    }
+                    ImGui::Text("Snake Game");
+                    ImGui::SameLine(ImGui::GetWindowWidth() - 150 );
+                    ImGui::Text("Score: %d", snake.size() - 2);
 
-                    ImGui::InputFloat2("Position", &newParticle.position.x);
-                    ImGui::InputFloat2("Velocity", &newParticle.velocity.x);
-                    ImGui::ColorPicker4("Color", &newParticle.color.r);
-                    ImGui::InputFloat("Size", &newParticle.size);
-
-                    if (ImGui::Button("Add Particle")) {
-//                        newParticle.position.x = offset;
-                        newParticle.color.a -= offset;
-                        offset += 0.005;
-                        particleSystem.AddParticle(newParticle);
-                        particleSystem.MakeLinked();
-                    }
-
-
-                    ImGui::SliderFloat("Orbit Velocity", &velo, 0, 0.25);
-                    if (ImGui::Button("Orbit")) {
-                        particleSystem.AddParticle({glm::vec2(0), glm::vec2(0), glm::vec4(1), 0.2, 1});
-                        particleSystem.AddParticle({glm::vec2(-0.4, 0), glm::vec2(0, velo), glm::vec4(1), 0.01, 1});
-                    }
                 }
                 ImGui::End();
+
+                if (!isRunning && !showMenu) {
+                    ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+
+                    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                    ImGui::SetNextWindowSize(ImVec2(400, 200)); // Adjust size as needed
+
+                    ImFont* bigFont = io.Fonts->Fonts[0]; // Assuming this is your large font
+                    ImGui::PushFont(bigFont);
+
+                    ImGui::Begin("Centered Window", nullptr, ImGuiWindowFlags_NoMove |
+                                                             ImGuiWindowFlags_NoResize |
+                                                             ImGuiWindowFlags_NoTitleBar |
+                                                             ImGuiWindowFlags_NoScrollbar |
+                                                             ImGuiWindowFlags_AlwaysAutoResize);
+
+                    ImGui::Text("Game Over");
+                    ImGui::Text("Score: %d", snake.size() - 2);
+                    if (ImGui::Button("Menu")) {
+                        showMenu = true;
+                    }
+
+                    ImGui::End();
+
+                    ImGui::PopFont();
+                }
+
+                if (showMenu) {
+                    ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+
+                    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                    ImGui::SetNextWindowSize(ImVec2(400, 200)); // Adjust size as needed
+
+                    ImFont* bigFont = io.Fonts->Fonts[0]; // Assuming this is your large font
+                    ImGui::PushFont(bigFont);
+
+                    ImGui::Begin("Menu", nullptr, ImGuiWindowFlags_NoMove |
+                                                             ImGuiWindowFlags_NoResize |
+                                                             ImGuiWindowFlags_NoTitleBar |
+                                                             ImGuiWindowFlags_NoScrollbar |
+                                                             ImGuiWindowFlags_AlwaysAutoResize);
+
+                    ImGui::Text("Menu");
+                    ImGui::SliderInt("Max Score", (int *)&maxScore, 0, 100);
+
+                    if (ImGui::Button("Start Game")) {
+                        startNewGame = true;
+                        showMenu = false;
+                    }
+
+                    if (ImGui::Button("Quit")) {
+                        quitGame = true;
+                    }
+
+                    ImGui::End();
+
+                    ImGui::PopFont();
+                }
 
                 imgui.render(commandBuffer);
 
@@ -156,5 +260,11 @@ namespace engine {
     void Application::Update() {}
 
     void Application::Render() {}
+
+    float Application::frand(float min, float max) {
+        static std::mt19937 generator(static_cast<unsigned int>(std::time(nullptr)));
+        std::uniform_real_distribution<float> distribution(min, max);
+        return distribution(generator);
+    }
 
 } // namespace engine

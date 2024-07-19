@@ -25,11 +25,10 @@ namespace engine {
         SnakeGame(Device& device, uint32_t maxParticles);
 
         void Update(float dt, const glm::vec2 &mousPos);
-        void Bind(VkCommandBuffer commandBuffer);
         void Render(VkCommandBuffer commandBuffer);
         void GameOver() const;
 
-        [[nodiscard]] uint32_t NumParticles() const { return m_particles.size(); }
+        [[nodiscard]] uint32_t NumParticles() const { return m_linkedParticles.size(); }
         [[nodiscard]] bool Running() const { return m_running; }
 
         void SetNumParticles(uint32_t n);
@@ -39,11 +38,10 @@ namespace engine {
 
     private:
         Device& m_device;
-        std::vector<Particle> m_particles;
+//        std::vector<Particle> m_particles;
         std::vector<Particle> m_apples;
         std::vector<LinkedParticle> m_linkedParticles;
         std::unique_ptr<QuadTree> m_quadTree;
-        std::unique_ptr<Buffer> m_vertexBuffer;
         uint32_t m_maxParticles;
         uint32_t m_maxApples{1};
         float m_snakeSize{0.01};
@@ -55,8 +53,7 @@ namespace engine {
 
         std::shared_ptr<PointForce> m_pointForce;
 
-        void CreateVertexBuffer();
-        void UpdateVertexBuffer();
+
 
 
         void ApplyGravity(float dt);
